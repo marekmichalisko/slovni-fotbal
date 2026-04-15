@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Slovní Fotbal vs AI</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;500;700&display=swap');
+        
+        * { box-sizing: border-box; font-family: 'Poppins', sans-serif; }
+        body { 
+            margin: 0; min-height: 100vh; background: linear-gradient(135deg, #0f2027, #203a43, #2c5364); 
+            color: white; display: flex; align-items: center; justify-content: center; padding: 20px;
+        }
+        
+        /* Glassmorphism panel */
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 20px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3); padding: 25px;
+        }
+
+        /* --- LOGIN SCREEN --- */
+        #loginScreen {
+            display: flex; flex-direction: column; align-items: center; text-align: center; max-width: 400px; width: 100%;
+        }
+        #loginScreen h1 { color: #00f2fe; margin-bottom: 10px; }
+        #loginScreen p { color: #ccc; margin-bottom: 25px; font-size: 0.9rem; }
+        
+        .custom-input { 
+            width: 100%; padding: 15px; border-radius: 10px; border: none; background: rgba(0,0,0,0.3); 
+            color: white; font-size: 1rem; outline: none; border: 1px solid transparent; transition: 0.3s; margin-bottom: 15px;
+        }
+        .custom-input:focus { border-color: #00f2fe; background: rgba(0,0,0,0.5); }
+        
+        .btn-primary { 
+            width: 100%; padding: 15px; border: none; border-radius: 10px; background: #00f2fe; color: black; 
+            font-weight: bold; cursor: pointer; transition: 0.3s; font-size: 1rem;
+        }
+        .btn-primary:hover { background: #4facfe; transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,242,254,0.4); }
+
+        /* --- GAME SCREEN --- */
+        #gameScreen { display: none; gap: 20px; width: 100%; max-width: 1000px; flex-wrap: wrap; justify-content: center; }
+        .game-container { flex: 2; min-width: 350px; display: flex; flex-direction: column; }
+        .leaderboard-container { flex: 1; min-width: 250px; }
+
+        .hud { display: flex; justify-content: space-between; margin-bottom: 15px; font-weight: 500; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 10px;}
+        .timer { color: #00f2fe; font-size: 1.2rem; font-weight: bold;}
+        .timer.danger { color: #ff0844; animation: pulse 1s infinite; }
+
+        #chat { flex-grow: 1; height: 350px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; margin-bottom: 15px; padding-right: 5px; scroll-behavior: smooth;}
+        #chat::-webkit-scrollbar { width: 5px; }
+        #chat::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.3); border-radius: 5px; }
+
+        .msg { padding: 10px 15px; border-radius: 15px; max-width: 80%; width: fit-content; animation: slideUp 0.3s ease-out; }
+        .user { background: linear-gradient(45deg, #4facfe, #00f2fe); color: #000; align-self: flex-end; border-bottom-right-radius: 0; font-weight: 500;}
+        .ai { background: linear-gradient(45deg, #43e97b, #38f9d7); color: #000; align-self: flex-start; border-bottom-left-radius: 0; font-weight: 500;}
+        .system { color: #ffb199; text-align: center; align-self: center; font-size: 0.9rem; margin: 10px 0;}
+        
+        .input-area { display: flex; gap: 10px; }
+        .input-area button:disabled { background: #555; cursor: not-allowed; transform: none; box-shadow: none; color: #888;}
+
+        h3 { margin-top: 0; color: #00f2fe; text-align: center; text-transform: uppercase; letter-spacing: 2px;}
+        .lb-list { display: flex; flex-direction: column; gap: 8px; margin-top: 15px; }
+        .lb-item { display: flex; justify-content: space-between; background: rgba(0,0,0,0.3); padding: 10px 15px; border-radius: 8px; }
+        .lb-item span:last-child { font-weight: bold; color: #43e97b; }
+
+        @keyframes slideUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+    </style>
+</head>
+<body>
+
+    <div id="loginScreen" class="glass-panel">
+        <h1>Slovní Fotbal vs AI</h1>
+        <p>Vyzvi Google Gemma 3 a ukaž, kdo má větší slovní zásobu. Pokoř AI a zapiš se do Síně slávy!</p>
+        <input type="text" id="playerNameInput" class="custom-input" placeholder="Tvoje přezdívka (nepovinné)..." onkeypress="if(event.key === 'Enter') startGame()">
+        <button class="btn-primary" onclick="startGame()">Vstoupit do hry</button>
+    </div>
+
+    <div id="gameScreen">
+        <div class="glass-panel game-container">
+            <div class="hud">
+                <div>Hráč: <span id="playerNameDisplay" style="color:#00f2fe"></span></div>
+                <div>Skóre: <span id="scoreDisplay">0</span></div>
+                <div class="timer" id="timerDisplay">15s</div>
+            </div>
+
+            <div id="chat">
+                <div class="msg system" id="startMsg"></div>
+            </div>
+
+            <div class="input-area">
+                <input type="text" id="wordInput" class="custom-input" style="margin-bottom:0;" placeholder="Začni hrát libovolným slovem..." autocomplete="off" oninput="this.value = this.value.replace(/\s/g, '')">
+                <button id="sendBtn" class="btn-primary" style="width: auto;" onclick="submitWord()">Poslat</button>
+            </div>
+        </div>
+
+        <div class="glass-panel leaderboard-container">
+            <h3>Síň slávy</h3>
+            <div class="lb-list" id="leaderboardList">
+                <div class="system">Načítám tabulku...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let playerName = "Anonym";
+        let usedWords = new Set();
+        let currentLetter = null;
+        let score = 0;
+        let timer = 15;
+        let timerInterval = null;
+        let gameActive = true;
+
+        const loginScreen = document.getElementById('loginScreen');
+        const gameScreen = document.getElementById('gameScreen');
+        const inputEl = document.getElementById('wordInput');
+        const sendBtn = document.getElementById('sendBtn');
+        const chatEl = document.getElementById('chat');
+        const timerEl = document.getElementById('timerDisplay');
+        const scoreEl = document.getElementById('scoreDisplay');
+
+        // Spuštění po stisku Enter v chatu
+        inputEl.addEventListener('keypress', function(e) { if (e.key === 'Enter') submitWord(); });
+
+        function startGame() {
+            let inputName = document.getElementById('playerNameInput').value.trim();
+            if (inputName !== "") playerName = inputName;
+            
+            document.getElementById('playerNameDisplay').innerText = playerName;
+            document.getElementById('startMsg').innerText = `Vítej, ${playerName}! Napiš první slovo. Hra ti po prvním tahu vždy určí písmeno, na které musíš začít.`;
+            
+            loginScreen.style.display = 'none';
+            gameScreen.style.display = 'flex';
+            fetchLeaderboard();
+            inputEl.focus();
+        }
+
+        function startTimer() {
+            clearInterval(timerInterval);
+            timer = 15;
+            timerEl.innerText = timer + 's';
+            timerEl.classList.remove('danger');
+            
+            timerInterval = setInterval(() => {
+                timer--;
+                timerEl.innerText = timer + 's';
+                if (timer <= 5) timerEl.classList.add('danger');
+                if (timer <= 0) endGame("Čas vypršel!", false);
+            }, 1000);
+        }
+
+        function addMessage(text, type) {
+            const div = document.createElement('div');
+            div.className = `msg ${type}`;
+            div.innerText = text;
+            chatEl.appendChild(div);
+            chatEl.scrollTop = chatEl.scrollHeight;
+        }
+
+        function endGame(reason, isWin) {
+            gameActive = false;
+            clearInterval(timerInterval);
+            inputEl.disabled = true;
+            sendBtn.disabled = true;
+            
+            addMessage(reason, 'system');
+            addMessage(isWin ? "🏆 VÍTĚZSTVÍ!" : "💀 GAME OVER", 'system');
+            
+            // Odeslání skóre na server
+            if (score > 0) {
+                fetch('/score', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({name: playerName, score: score})
+                }).then(() => {
+                    fetchLeaderboard();
+                    showRestartBtn();
+                });
+            } else {
+                showRestartBtn();
+            }
+        }
+
+        function showRestartBtn() {
+            const btn = document.createElement('button');
+            btn.innerText = "Hrát znovu";
+            btn.className = "btn-primary";
+            btn.style.marginTop = "15px";
+            btn.onclick = () => location.reload();
+            chatEl.appendChild(btn);
+            chatEl.scrollTop = chatEl.scrollHeight;
+        }
+
+        async function fetchLeaderboard() {
+            try {
+                const res = await fetch('/leaderboard');
+                const data = await res.json();
+                const lb = document.getElementById('leaderboardList');
+                lb.innerHTML = '';
+                if(data.length === 0) lb.innerHTML = '<div class="system">Zatím nikdo nehrál.</div>';
+                data.forEach((player, index) => {
+                    lb.innerHTML += `<div class="lb-item"><span>${index + 1}. ${player.name}</span><span>${player.score}</span></div>`;
+                });
+            } catch(e) {}
+        }
+
+        async function submitWord() {
+            if (!gameActive) return;
+            let word = inputEl.value.trim().toLowerCase();
+            inputEl.value = '';
+            if (!word) return;
+
+            if (currentLetter && !word.startsWith(currentLetter)) {
+                return endGame(`Slovo musí začínat na '${currentLetter.toUpperCase()}'!`, false);
+            }
+            if (usedWords.has(word)) {
+                return endGame(`Slovo '${word}' už bylo!`, false);
+            }
+
+            clearInterval(timerInterval);
+            addMessage(word, 'user');
+            usedWords.add(word);
+            score++;
+            scoreEl.innerText = score;
+            
+            inputEl.disabled = true;
+            sendBtn.disabled = true;
+            addMessage('...', 'ai');
+            const loadingMsg = chatEl.lastChild;
+
+            inputEl.placeholder = "Čekej na tah AI...";
+
+            try {
+                const res = await fetch('/play', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({word: word})
+                });
+                const data = await res.json();
+                loadingMsg.remove();
+                
+                if (data.error) return endGame(data.error, false);
+
+                let aiWord = data.ai_word;
+                let expected = word.slice(-1);
+                
+                if (!aiWord.startsWith(expected)) {
+                    addMessage(aiWord, 'ai');
+                    return endGame(`AI se spletlo! Mělo začít na '${expected.toUpperCase()}'. VÍTĚZÍŠ!`, true);
+                }
+                if (usedWords.has(aiWord)) {
+                    addMessage(aiWord, 'ai');
+                    return endGame(`AI zopakovalo slovo '${aiWord}'! VÍTĚZÍŠ!`, true);
+                }
+
+                addMessage(aiWord, 'ai');
+                usedWords.add(aiWord);
+                score++;
+                scoreEl.innerText = score;
+                currentLetter = aiWord.slice(-1);
+                
+                inputEl.placeholder = `Nyní musíš začít na '${currentLetter.toUpperCase()}'...`;
+                inputEl.disabled = false;
+                sendBtn.disabled = false;
+                inputEl.focus();
+                startTimer();
+
+            } catch (err) {
+                loadingMsg.remove();
+                endGame('Ztráta spojení se serverem.', false);
+            }
+        }
+    </script>
+</body>
+</html>

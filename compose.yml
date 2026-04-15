@@ -1,0 +1,7 @@
+services:
+  app:
+    build: .
+    environment:
+      - REDIS_HOST=redis
+  redis:
+    image: redis:alpine
