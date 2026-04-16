@@ -66,7 +66,16 @@ async def get_leaderboard():
         return [{"name": k, "score": int(v)} for k, v in top]
     except:
         return []
+        
 
+
+@app.get("/reset-db")
+async def reset_db():
+    if db:
+        db.delete("leaderboard")
+        return {"status": "Databáze byla úspěšně promazána"}
+    return {"status": "Chyba: Databáze není připojená"}
+    
 if __name__ == "__main__":
     # Portál přiděluje port dynamicky, uvicorn na něm musí naslouchat
     port = int(os.environ.get("PORT", 8000))
